@@ -1,24 +1,13 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PrefsHelper {
-  static Future<bool> hasVoted(String title) async {
-    final p = await SharedPreferences.getInstance();
-    return p.getBool('voted_$title') ?? false;
+  static Future<bool> hasVoted(String movie) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('voted_$movie') ?? false;
   }
 
-  static Future<void> setVoted(String title) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setBool('voted_$title', true);
-  }
-
-  static Future<bool> isBookmarked(String id) async {
-    final p = await SharedPreferences.getInstance();
-    return p.getBool('bookmark_$id') ?? false;
-  }
-
-  static Future<void> toggleBookmark(String id) async {
-    final p = await SharedPreferences.getInstance();
-    final cur = p.getBool('bookmark_$id') ?? false;
-    await p.setBool('bookmark_$id', !cur);
+  static Future<void> setVoted(String movie) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('voted_$movie', true);
   }
 }

@@ -4,13 +4,14 @@ class VoteResult {
 
   VoteResult({required this.title, required this.totalVotes});
 
-  Map<String, dynamic> toMap() => {
-    'title': title,
-    'totalVotes': totalVotes,
-  };
+  factory VoteResult.fromMap(Map<String, dynamic> map) {
+    return VoteResult(
+      title: map['title'] ?? '',
+      totalVotes: map['totalVotes'] ?? 0,
+    );
+  }
 
-  factory VoteResult.fromMap(Map<String,dynamic> m) => VoteResult(
-    title: m['title'] as String,
-    totalVotes: (m['totalVotes'] as num).toInt(),
-  );
+  Map<String, dynamic> toMap() {
+    return {'title': title, 'totalVotes': totalVotes};
+  }
 }

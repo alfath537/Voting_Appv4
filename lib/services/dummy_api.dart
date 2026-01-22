@@ -19,8 +19,11 @@ class DummyAPI {
 
   static Future<bool> vote(String title) async {
     await Future.delayed(const Duration(milliseconds: 300));
-    if (_votes.containsKey(title)) _votes[title] = _votes[title]! + 1;
-    else _votes[title] = 1;
+    if (_votes.containsKey(title)) {
+      _votes[title] = _votes[title]! + 1;
+    } else {
+      _votes[title] = 1;
+    }
     return true;
   }
 

@@ -5,7 +5,6 @@ import 'history_page.dart';
 import 'achievements_page.dart';
 import '../services/auth_prefs.dart';
 import 'logout_page.dart';
-import '../services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});

@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:location/location.dart';
+import 'package:contacts_service/contacts_service.dart';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({super.key});
 
@@ -13,14 +21,50 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   bool microphone = false;
   bool contact = false;
 
+  BannerAd? myBannerAd;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupFCM();
+    _setupBannerAd();
+  }
+
+  // Firebase Cloud Messaging
+  Future<void> _setupFCM() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      String? token = await messaging.getToken();
+      debugPrint('FCM Token: $token');
+    } catch (e) {
+      debugPrint('FCM setup error: $e');
+    }
+  }
+
+  // Banner Ad setup
+  void _setupBannerAd() {
+    MobileAds.instance.initialize().then((_) {
+      myBannerAd = BannerAd(
+        adUnitId: 'ca-app-pub-3940256099942544/6300978111', // Testing ID resmi
+        size: AdSize.banner,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (_) => debugPrint('Banner Ad loaded'),
+          onAdFailedToLoad: (ad, err) {
+            debugPrint('Banner Ad failed: $err');
+            ad.dispose();
+          },
+        ),
+      )..load();
+      setState(() {});
+    });
+  }
+
   Future<void> _confirmToggle(String title, bool currentValue, Function(bool) onConfirmed) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Confirm',
-          style: const TextStyle(fontFamily: 'PTSerif'),
-        ),
+        title: const Text('Confirm', style: TextStyle(fontFamily: 'PTSerif')),
         content: Text(
           'Are you sure you want to ${currentValue ? 'disable' : 'enable'} $title access?',
           style: const TextStyle(fontFamily: 'PTSerif'),
@@ -28,17 +72,11 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(fontFamily: 'PTSerif'),
-            ),
+            child: const Text('Cancel', style: TextStyle(fontFamily: 'PTSerif')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Yes',
-              style: TextStyle(fontFamily: 'PTSerif'),
-            ),
+            child: const Text('Yes', style: TextStyle(fontFamily: 'PTSerif')),
           ),
         ],
       ),
@@ -50,14 +88,58 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   }
 
   void _saveChanges() {
-    
-    debugPrint('Saved settings: Location:$location, Camera:$camera, Mic:$microphone, Contact:$contact');
+    debugPrint(
+        'Settings saved -> Location:$location, Camera:$camera, Mic:$microphone, Contact:$contact');
+
+    FirebaseFirestore.instance.collection('user_settings').doc('user1').set({
+      'location': location,
+      'camera': camera,
+      'microphone': microphone,
+      'contact': contact,
+      'updated_at': DateTime.now(),
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Changes saved'),
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _handleLocationSwitch(bool newValue) async {
+    if (newValue) {
+      try {
+        Location loc = Location();
+        await loc.requestPermission();
+        debugPrint('Location enabled');
+      } catch (e) {
+        debugPrint('Location error: $e');
+      }
+    }
+  }
+
+  Future<void> _handleCameraSwitch(bool newValue) async {
+    if (newValue) {
+      try {
+        ImagePicker picker = ImagePicker();
+        await picker.pickImage(source: ImageSource.camera);
+        debugPrint('Camera enabled');
+      } catch (e) {
+        debugPrint('Camera error: $e');
+      }
+    }
+  }
+
+  Future<void> _handleContactSwitch(bool newValue) async {
+    if (newValue) {
+      try {
+        await ContactsService.getContacts();
+        debugPrint('Contacts access enabled');
+      } catch (e) {
+        debugPrint('Contacts error: $e');
+      }
+    }
   }
 
   @override
@@ -81,14 +163,20 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
               title: const Text("Location Access", style: TextStyle(fontFamily: 'PTSerif')),
               value: location,
               onChanged: (val) => _confirmToggle("Location", location, (newValue) {
-                setState(() => location = newValue);
+                setState(() {
+                  location = newValue;
+                  _handleLocationSwitch(newValue);
+                });
               }),
             ),
             SwitchListTile(
               title: const Text("Camera Access", style: TextStyle(fontFamily: 'PTSerif')),
               value: camera,
               onChanged: (val) => _confirmToggle("Camera", camera, (newValue) {
-                setState(() => camera = newValue);
+                setState(() {
+                  camera = newValue;
+                  _handleCameraSwitch(newValue);
+                });
               }),
             ),
             SwitchListTile(
@@ -102,7 +190,10 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
               title: const Text("Contact Access", style: TextStyle(fontFamily: 'PTSerif')),
               value: contact,
               onChanged: (val) => _confirmToggle("Contact", contact, (newValue) {
-                setState(() => contact = newValue);
+                setState(() {
+                  contact = newValue;
+                  _handleContactSwitch(newValue);
+                });
               }),
             ),
             const SizedBox(height: 24),
@@ -135,9 +226,25 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+            // Banner Ad
+            if (myBannerAd != null)
+              SizedBox(
+                height: myBannerAd!.size.height.toDouble(),
+                width: myBannerAd!.size.width.toDouble(),
+                child: AdWidget(ad: myBannerAd!),
+              )
+            else
+              const SizedBox(),
           ],
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    myBannerAd?.dispose();
+    super.dispose();
   }
 }

@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
 import 'splash_screen.dart';
-import 'services/vote_db.dart'; 
+import 'firebase_options.dart';
+import 'firebase_mobile.dart';
+import 'dart:io';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp();
-  } catch (_) {}
+  // FIX Windows
+  if (Platform.isWindows) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
 
-  try {
-    await VoteDB.database;
-  } catch (_) {}
+  // Firebase init
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // AppCheck & FCM
+  await initFirebaseMobile();
 
   runApp(
     ChangeNotifierProvider(
@@ -26,15 +33,18 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Voting App',
-      themeMode: themeProvider.themeMode,
-      theme: ThemeData(brightness: Brightness.light, primarySwatch: Colors.blue),
-      darkTheme: ThemeData(brightness: Brightness.dark, primarySwatch: Colors.blueGrey),
+      theme:
+          themeProvider.isDarkMode
+              ? ThemeData.dark()
+              : ThemeData(primarySwatch: Colors.deepPurple),
       home: const SplashScreen(),
     );
   }

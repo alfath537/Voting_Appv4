@@ -1,90 +1,125 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../services/vote_service.dart';
 import '../services/vote_stream.dart';
 
-class ViewResultsPage extends StatelessWidget {
+class ViewResultsPage extends StatefulWidget {
   const ViewResultsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const colors = [Colors.purple, Colors.deepPurple, Colors.indigo, Colors.orange, Colors.teal, Colors.pinkAccent];
+  State<ViewResultsPage> createState() => _ViewResultsPageState();
+}
 
+class _ViewResultsPageState extends State<ViewResultsPage> {
+  final List<Color> barColors = [
+    Colors.deepPurple,
+    Colors.blue,
+    Colors.orange,
+    Colors.green,
+    Colors.red,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    VoteStream.refresh(); 
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Voting Results')),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            const Text('Voting Results', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            FutureBuilder<Map<String,int>>(
-              future: VoteService.fetchVotes(),
-              builder: (context, snap) {
-                if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                final total = snap.data!.values.fold<int>(0, (a,b) => a+b);
-                return Text('Total votes: $total');
-              },
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: StreamBuilder<Map<String,int>>(
-                stream: VoteStream.polling(interval: const Duration(seconds: 3)),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: CircularProgressIndicator());
-                  final votesMap = snapshot.data!;
-                  final movies = votesMap.keys.toList();
-                  final votes = votesMap.values.toList();
-                  final totalVotes = votes.isNotEmpty ? votes.reduce((a,b) => a+b) : 0;
+        child: StreamBuilder<Map<String, int>>(
+          stream: VoteStream.stream,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('No votes yet'));
+            }
 
-                  // build bar chart
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: BarChart(
-                          BarChartData(
-                            alignment: BarChartAlignment.spaceEvenly,
-                            maxY: (votes.isNotEmpty ? votes.reduce((a,b) => a>b ? a : b).toDouble() : 10) + 10,
-                            barGroups: List.generate(movies.length, (i) {
-                              return BarChartGroupData(
-                                x: i,
-                                barRods: [BarChartRodData(toY: votes[i].toDouble(), color: colors[i % colors.length], width: 28)],
-                              );
-                            }),
-                            titlesData: FlTitlesData(
-                              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
-                              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) {
-                                final idx = value.toInt();
-                                if (idx >= 0 && idx < movies.length) return Text(movies[idx], style: const TextStyle(fontSize: 10));
-                                return const Text('');
-                              })),
-                            ),
+            final votesMap = snapshot.data!;
+            final movies = votesMap.keys.toList();
+            final votes = votesMap.values.toList();
+            final maxVotes = votes.isEmpty ? 1 : votes.reduce((a, b) => a > b ? a : b);
+
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: movies.length * 80.0,
+                height: 300,
+                child: BarChart(
+                  BarChartData(
+                    maxY: (maxVotes + 1).toDouble(),
+                    barGroups: List.generate(movies.length, (i) {
+                      return BarChartGroupData(
+                        x: i,
+                        barRods: [
+                          BarChartRodData(
+                            toY: votes[i].toDouble(),
+                            width: 30,
+                            color: barColors[i % barColors.length],
+                            borderRadius: BorderRadius.circular(4),
                           ),
+                        ],
+                        showingTooltipIndicators: [0],
+                      );
+                    }),
+                    titlesData: FlTitlesData(
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            final index = value.toInt();
+                            if (index < movies.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  movies[index],
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            }
+                            return const Text('');
+                          },
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: List.generate(movies.length, (index) {
-                          final percent = totalVotes > 0 ? (votes[index] / totalVotes) * 100 : 0;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                Container(width: 16, height: 16, color: colors[index % colors.length]),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text('${movies[index]} - ${votes[index]} votes (${percent.toStringAsFixed(1)}%)')),
-                              ],
-                            ),
-                          );
-                        }),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: 1,
+                          getTitlesWidget: (value, meta) {
+                            return Text(value.toInt().toString());
+                          },
+                        ),
                       ),
-                    ],
-                  );
-                },
+                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    barTouchData: BarTouchData(
+                      enabled: true,
+                      touchTooltipData: BarTouchTooltipData(
+                        tooltipPadding: const EdgeInsets.all(8),
+                        tooltipMargin: 8,
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          final movie = movies[group.x.toInt()];
+                          final count = votes[group.x.toInt()];
+                          return BarTooltipItem(
+                            '$movie\n$count votes',
+                            const TextStyle(color: Colors.white),
+                          );
+                        },
+                      ),
+                    ),
+                    gridData: FlGridData(show: true),
+                    borderData: FlBorderData(show: false),
+                  ),
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
